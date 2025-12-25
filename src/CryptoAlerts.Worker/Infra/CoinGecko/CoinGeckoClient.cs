@@ -31,6 +31,11 @@ public sealed class CoinGeckoClient : IMarketDataProvider
         // Precisamos mapear o symbol para o coin_id
         var coinId = MapSymbolToCoinId(symbol);
         
+        if (string.IsNullOrWhiteSpace(coinId))
+        {
+            throw new ArgumentException($"Não foi possível mapear o símbolo '{symbol}' para um coin_id do CoinGecko.");
+        }
+        
         // Mapear interval para days (CoinGecko OHLC usa days como parâmetro)
         // O endpoint retorna candles diários, então calculamos quantos dias precisamos
         var days = MapIntervalToDays(interval, limit);
@@ -47,10 +52,12 @@ public sealed class CoinGeckoClient : IMarketDataProvider
         {
             var errorBody = await resp.Content.ReadAsStringAsync(ct);
             var statusCode = (int)resp.StatusCode;
+            var fullUrl = $"{_http.BaseAddress}{url}";
             
             throw new HttpRequestException(
                 $"Falha ao buscar dados do CoinGecko. Status: {statusCode} {resp.StatusCode}. " +
-                $"URL: {_http.BaseAddress}{url}. " +
+                $"URL: {fullUrl}. " +
+                $"Símbolo: {symbol} -> Coin ID: {coinId}. " +
                 $"Resposta: {errorBody}",
                 null,
                 resp.StatusCode
@@ -93,44 +100,77 @@ public sealed class CoinGeckoClient : IMarketDataProvider
     // Mapeia símbolos comuns para coin_id do CoinGecko
     private static string MapSymbolToCoinId(string symbol)
     {
-        // Remove "USDT", "USD", etc. e converte para lowercase
+        // Primeiro tenta mapear o símbolo completo (ex: "BTCUSDT" -> "bitcoin")
+        var symbolLower = symbol.ToLowerInvariant();
+        
+        // Mapeamento direto de símbolos completos
+        if (symbolLower.Contains("btc"))
+            return "bitcoin";
+        if (symbolLower.Contains("eth"))
+            return "ethereum";
+        if (symbolLower.Contains("bnb"))
+            return "binancecoin";
+        if (symbolLower.Contains("sol"))
+            return "solana";
+        if (symbolLower.Contains("ada"))
+            return "cardano";
+        if (symbolLower.Contains("xrp"))
+            return "ripple";
+        if (symbolLower.Contains("dot"))
+            return "polkadot";
+        if (symbolLower.Contains("doge"))
+            return "dogecoin";
+        if (symbolLower.Contains("matic"))
+            return "matic-network";
+        if (symbolLower.Contains("avax"))
+            return "avalanche-2";
+        if (symbolLower.Contains("link"))
+            return "chainlink";
+        if (symbolLower.Contains("ltc"))
+            return "litecoin";
+        if (symbolLower.Contains("bch"))
+            return "bitcoin-cash";
+        if (symbolLower.Contains("xlm"))
+            return "stellar";
+        if (symbolLower.Contains("atom"))
+            return "cosmos";
+        if (symbolLower.Contains("algo"))
+            return "algorand";
+        if (symbolLower.Contains("vet"))
+            return "vechain";
+        if (symbolLower.Contains("icp"))
+            return "internet-computer";
+        if (symbolLower.Contains("fil"))
+            return "filecoin";
+        if (symbolLower.Contains("trx"))
+            return "tron";
+        if (symbolLower.Contains("etc"))
+            return "ethereum-classic";
+        if (symbolLower.Contains("xmr"))
+            return "monero";
+        if (symbolLower.Contains("eos"))
+            return "eos";
+        if (symbolLower.Contains("aave"))
+            return "aave";
+        if (symbolLower.Contains("uni"))
+            return "uniswap";
+        if (symbolLower.Contains("cake"))
+            return "pancakeswap-token";
+        
+        // Se não encontrou, remove sufixos comuns e tenta novamente
         var baseSymbol = symbol
             .Replace("USDT", "", StringComparison.OrdinalIgnoreCase)
             .Replace("USD", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("BTC", "", StringComparison.OrdinalIgnoreCase)
             .ToLowerInvariant();
-
-        // Mapeamento comum
-        return baseSymbol switch
+        
+        // Retorna o baseSymbol ou lança erro se vazio
+        if (string.IsNullOrWhiteSpace(baseSymbol))
         {
-            "btc" => "bitcoin",
-            "eth" => "ethereum",
-            "bnb" => "binancecoin",
-            "sol" => "solana",
-            "ada" => "cardano",
-            "xrp" => "ripple",
-            "dot" => "polkadot",
-            "doge" => "dogecoin",
-            "matic" => "matic-network",
-            "avax" => "avalanche-2",
-            "link" => "chainlink",
-            "ltc" => "litecoin",
-            "bch" => "bitcoin-cash",
-            "xlm" => "stellar",
-            "atom" => "cosmos",
-            "algo" => "algorand",
-            "vet" => "vechain",
-            "icp" => "internet-computer",
-            "fil" => "filecoin",
-            "trx" => "tron",
-            "etc" => "ethereum-classic",
-            "xmr" => "monero",
-            "eos" => "eos",
-            "aave" => "aave",
-            "uni" => "uniswap",
-            "cake" => "pancakeswap-token",
-            _ => baseSymbol // Tenta usar o símbolo direto (pode não funcionar)
-        };
+            throw new ArgumentException($"Não foi possível mapear o símbolo '{symbol}' para um coin_id do CoinGecko. " +
+                "Configure um símbolo válido (ex: BTCUSDT, ETHUSDT) ou adicione o mapeamento em MapSymbolToCoinId.");
+        }
+        
+        return baseSymbol;
     }
 
     // Mapeia intervalos para days (CoinGecko OHLC retorna candles diários)
