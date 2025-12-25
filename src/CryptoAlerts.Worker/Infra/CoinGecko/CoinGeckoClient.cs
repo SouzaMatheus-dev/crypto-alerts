@@ -75,15 +75,18 @@ public sealed class CoinGeckoClient : IMarketDataProvider
 
         foreach (var item in doc.RootElement.EnumerateArray())
         {
-            // CoinGecko retorna: [timestamp_ms, open, high, low, close]
+            // CoinGecko OHLC retorna: [timestamp_ms, open, high, low, close]
+            // Todos os valores são números, não strings
             var timestampMs = item[0].GetInt64();
-            var open = ParseDec(item[1].GetString());
-            var high = ParseDec(item[2].GetString());
-            var low = ParseDec(item[3].GetString());
-            var close = ParseDec(item[4].GetString());
+            
+            // Lê os valores numéricos diretamente
+            var open = item[1].GetDecimal();
+            var high = item[2].GetDecimal();
+            var low = item[3].GetDecimal();
+            var close = item[4].GetDecimal();
 
             // CoinGecko não retorna volume no OHLC, então usamos 0
-            // Se precisar de volume, pode usar outro endpoint
+            // Se precisar de volume, pode usar outro endpoint como market_chart
             list.Add(new Kline(
                 DateTimeOffset.FromUnixTimeMilliseconds(timestampMs),
                 open, high, low, close, 0m
@@ -92,9 +95,6 @@ public sealed class CoinGeckoClient : IMarketDataProvider
 
         // Retorna os últimos N candles (CoinGecko retorna ordenado do mais antigo ao mais recente)
         return list.TakeLast(limit).ToList();
-
-        static decimal ParseDec(string? s) =>
-            decimal.Parse(s ?? "0", NumberStyles.Any, CultureInfo.InvariantCulture);
     }
 
     // Mapeia símbolos comuns para coin_id do CoinGecko
