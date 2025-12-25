@@ -22,15 +22,11 @@ public sealed class EvaluateMarketUseCase
 
         var rsi = Indicators.Rsi(closes, _cfg.RsiPeriod);
 
-        // DCA drop simples: compara contra o maior close dos últimos 48 candles
         var window = closes.TakeLast(Math.Min(48, closes.Count)).ToList();
         var recentHigh = window.Max();
-        var dropPct = Indicators.PercentChange(recentHigh, last); // negativo quando caiu
+        var dropPct = Indicators.PercentChange(recentHigh, last);
         var dropAbs = Math.Abs(dropPct);
 
-        // Regras MVP:
-        // - Comprar: RSI <= BuyThreshold OU queda >= DcaDropPercent
-        // - Vender: RSI >= SellThreshold (apenas aviso; você decide)
         if (rsi <= _cfg.BuyRsiThreshold || (dropPct < 0 && dropAbs >= _cfg.DcaDropPercent))
         {
             return new AlertDecision(

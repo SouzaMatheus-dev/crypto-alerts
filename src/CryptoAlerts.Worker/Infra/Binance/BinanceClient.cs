@@ -23,23 +23,17 @@ public sealed class BinanceClient : IMarketDataProvider
 
     public async Task<IReadOnlyList<Kline>> GetKlinesAsync(string symbol, string interval, int limit, CancellationToken ct)
     {
-        // Endpoint público:
-        // GET /api/v3/klines?symbol=BTCUSDT&interval=1h&limit=200
         var url = $"/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}";
         
-        // Tenta primeiro com a URL configurada
         using var resp = await _http.GetAsync(url, ct);
         
-        // Se receber erro 451, tenta automaticamente com o endpoint alternativo data.binance.com
         if (!resp.IsSuccessStatusCode && (int)resp.StatusCode == 451)
         {
             var originalBaseUrl = _http.BaseAddress?.ToString();
             var errorBody = await resp.Content.ReadAsStringAsync(ct);
             
-            // Endpoint alternativo para dados públicos (não retorna 451)
             var fallbackUrl = "https://data.binance.com";
             
-            // Se já está usando o fallback, não tenta novamente
             if (originalBaseUrl?.Contains("data.binance.com") == true)
             {
                 throw new HttpRequestException(
@@ -53,7 +47,6 @@ public sealed class BinanceClient : IMarketDataProvider
             
             Console.WriteLine($"Erro 451 detectado. Tentando endpoint alternativo: {fallbackUrl}");
             
-            // Cria um novo HttpClient para o endpoint alternativo
             using var fallbackHttp = new HttpClient { Timeout = _http.Timeout };
             fallbackHttp.BaseAddress = new Uri(fallbackUrl);
             fallbackHttp.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -97,8 +90,6 @@ public sealed class BinanceClient : IMarketDataProvider
     
     private static IReadOnlyList<Kline> ParseKlines(string raw)
     {
-        // parse simples sem dependências externas
-        // usamos System.Text.Json para ler como JsonElement
         var doc = System.Text.Json.JsonDocument.Parse(raw);
         var list = new List<Kline>();
 

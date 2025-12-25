@@ -7,7 +7,5 @@ public sealed class EmailOptions
 
     public string FromEmail { get; set; } = "";
     public string ToEmail { get; set; } = "";
-
-    // Gmail App Password (não é a senha normal)
     public string AppPassword { get; set; } = "";
 }

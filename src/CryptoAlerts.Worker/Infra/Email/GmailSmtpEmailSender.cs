@@ -20,7 +20,6 @@ public sealed class GmailSmtpEmailSender
 
         using var msg = new MailMessage(_opt.FromEmail, _opt.ToEmail, subject, body);
 
-        // SmtpClient não é "true async" mas o SendMailAsync já resolve para o MVP
         await client.SendMailAsync(msg, ct);
     }
 }

@@ -2,14 +2,12 @@ namespace CryptoAlerts.Worker.UseCases;
 
 public static class Indicators
 {
-    // RSI clássico (Wilder). Para MVP, já é suficiente.
     public static decimal Rsi(IReadOnlyList<decimal> closes, int period)
     {
         if (closes.Count < period + 1) return 50m;
 
         decimal gain = 0m, loss = 0m;
 
-        // seed
         for (int i = 1; i <= period; i++)
         {
             var diff = closes[i] - closes[i - 1];

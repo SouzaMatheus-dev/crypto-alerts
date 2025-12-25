@@ -32,7 +32,6 @@ if (string.IsNullOrWhiteSpace(emailOpt.FromEmail) ||
     return;
 }
 
-// Escolhe o provedor de dados de mercado (CoinGecko é o padrão, sem bloqueio geográfico)
 IMarketDataProvider marketData;
 var provider = Env("MARKET_DATA_PROVIDER")?.ToLowerInvariant() ?? "coingecko";
 
@@ -54,7 +53,7 @@ else
     var coinGeckoOpt = new CoinGeckoOptions
     {
         BaseUrl = Env("COINGECKO_BASEURL") ?? "https://api.coingecko.com",
-        ApiKey = Env("COINGECKO_APIKEY") // opcional, mas recomendado para rate limits maiores
+        ApiKey = Env("COINGECKO_APIKEY")
     };
     marketData = new CoinGeckoClient(http, coinGeckoOpt);
     Console.WriteLine("Usando CoinGecko como provedor de dados de mercado (sem bloqueio geográfico)");
@@ -67,7 +66,6 @@ try
 {
     var decision = await useCase.ExecuteAsync(CancellationToken.None);
 
-    // Envia e-mail apenas quando houver alerta de compra ou venda
     if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
     {
         await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
@@ -83,7 +81,6 @@ catch (HttpRequestException httpEx)
     var errorMsg = $"Erro ao conectar com a API de dados de mercado: {httpEx.Message}";
     Console.WriteLine($"ERRO: {errorMsg}");
 
-    // Se for erro 451 (bloqueio geográfico da Binance), fornece dicas
     if (httpEx.Message.Contains("451") || httpEx.Message.Contains("Unavailable For Legal Reasons"))
     {
         Console.WriteLine();
@@ -95,10 +92,6 @@ catch (HttpRequestException httpEx)
         Console.WriteLine();
     }
 
-    // Opcional: enviar e-mail de erro
-    // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
-
-    // Retorna código de erro para falhar o workflow
     Environment.Exit(1);
 }
 catch (Exception ex)
@@ -107,9 +100,5 @@ catch (Exception ex)
     Console.WriteLine($"ERRO: {errorMsg}");
     Console.WriteLine(ex.ToString());
 
-    // Opcional: enviar e-mail de erro
-    // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
-
-    // Retorna código de erro para falhar o workflow
     Environment.Exit(1);
 }
