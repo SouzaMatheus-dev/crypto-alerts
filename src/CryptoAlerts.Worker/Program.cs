@@ -67,22 +67,27 @@ try
 {
     var decision = await useCase.ExecuteAsync(CancellationToken.None);
 
-    // manda e-mail só quando for BUY/SELL; se quiser diário/healthcheck, ajusta
-    if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
-    {
-        await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
-        Console.WriteLine($"Email sent: {decision.Title}");
-    }
-    else
-    {
-        Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
-    }
+    // TESTE: Envia email sempre (mesmo sem alerta) para testar no GitHub Actions
+    // TODO: Reverter depois do teste para enviar apenas quando houver alerta
+    await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
+    Console.WriteLine($"Email sent: {decision.Title} - {decision.Message}");
+
+    // Código original (comentado para teste):
+    // if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
+    // {
+    //     await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
+    //     Console.WriteLine($"Email sent: {decision.Title}");
+    // }
+    // else
+    // {
+    //     Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
+    // }
 }
 catch (HttpRequestException httpEx)
 {
     var errorMsg = $"Erro ao conectar com a API de dados de mercado: {httpEx.Message}";
     Console.WriteLine($"ERRO: {errorMsg}");
-    
+
     // Se for erro 451 (bloqueio geográfico da Binance), fornece dicas
     if (httpEx.Message.Contains("451") || httpEx.Message.Contains("Unavailable For Legal Reasons"))
     {
@@ -94,10 +99,10 @@ catch (HttpRequestException httpEx)
         Console.WriteLine("  3. Execute o worker em uma região não bloqueada");
         Console.WriteLine();
     }
-    
+
     // Opcional: enviar e-mail de erro
     // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
-    
+
     // Retorna código de erro para falhar o workflow
     Environment.Exit(1);
 }
@@ -106,10 +111,10 @@ catch (Exception ex)
     var errorMsg = $"Erro inesperado: {ex.Message}";
     Console.WriteLine($"ERRO: {errorMsg}");
     Console.WriteLine(ex.ToString());
-    
+
     // Opcional: enviar e-mail de erro
     // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
-    
+
     // Retorna código de erro para falhar o workflow
     Environment.Exit(1);
 }
