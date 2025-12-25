@@ -58,8 +58,32 @@ try
         Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
     }
 }
+catch (HttpRequestException httpEx)
+{
+    var errorMsg = $"Erro ao conectar com a API da Binance: {httpEx.Message}";
+    Console.WriteLine($"ERRO: {errorMsg}");
+    
+    // Se for erro 451 (bloqueio geográfico), fornece dicas
+    if (httpEx.Message.Contains("451") || httpEx.Message.Contains("Unavailable For Legal Reasons"))
+    {
+        Console.WriteLine();
+        Console.WriteLine("DICA: O erro 451 geralmente indica bloqueio geográfico.");
+        Console.WriteLine("Soluções possíveis:");
+        Console.WriteLine("  1. Use uma URL alternativa da Binance (ex: api.binance.us)");
+        Console.WriteLine("  2. Execute o worker em uma região não bloqueada");
+        Console.WriteLine("  3. Configure um proxy se necessário");
+        Console.WriteLine();
+    }
+    
+    // Opcional: enviar e-mail de erro
+    // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
+}
 catch (Exception ex)
 {
-    // opcional: mandar e-mail de erro também
+    var errorMsg = $"Erro inesperado: {ex.Message}";
+    Console.WriteLine($"ERRO: {errorMsg}");
     Console.WriteLine(ex.ToString());
+    
+    // Opcional: enviar e-mail de erro
+    // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
 }

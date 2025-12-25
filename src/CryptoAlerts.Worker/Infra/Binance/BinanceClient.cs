@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Http;
 using System.Net.Http.Headers;
 
 namespace CryptoAlerts.Worker.Infra.Binance;
@@ -25,7 +26,33 @@ public sealed class BinanceClient
         // GET /api/v3/klines?symbol=BTCUSDT&interval=1h&limit=200
         var url = $"/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}";
         using var resp = await _http.GetAsync(url, ct);
-        resp.EnsureSuccessStatusCode();
+        
+        if (!resp.IsSuccessStatusCode)
+        {
+            var errorBody = await resp.Content.ReadAsStringAsync(ct);
+            var statusCode = (int)resp.StatusCode;
+            
+            // Erro 451: Unavailable For Legal Reasons - geralmente bloqueio geográfico
+            if (statusCode == 451)
+            {
+                throw new HttpRequestException(
+                    $"Binance API retornou 451 (Unavailable For Legal Reasons). " +
+                    $"Isso geralmente indica bloqueio geográfico. " +
+                    $"URL: {_http.BaseAddress}{url}. " +
+                    $"Resposta: {errorBody}",
+                    null,
+                    resp.StatusCode
+                );
+            }
+            
+            throw new HttpRequestException(
+                $"Falha ao buscar dados da Binance. Status: {statusCode} {resp.StatusCode}. " +
+                $"URL: {_http.BaseAddress}{url}. " +
+                $"Resposta: {errorBody}",
+                null,
+                resp.StatusCode
+            );
+        }
 
         var raw = await resp.Content.ReadAsStringAsync(ct);
 
