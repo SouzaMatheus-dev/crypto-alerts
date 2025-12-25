@@ -1,0 +1,38 @@
+name: crypto-alerts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"  # a cada 15 min
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Run
+        env:
+          GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+          BINANCE_BASEURL: "https://api.binance.com"
+          BINANCE_APIKEY: ${{ secrets.BINANCE_APIKEY }}
+          BINANCE_SECRETKEY: ${{ secrets.BINANCE_SECRETKEY }}
+
+          RULES_SYMBOL: "BTCUSDT"
+          RULES_TIMEFRAME: "1h"
+          RULES_RSI_PERIOD: "14"
+          RULES_BUY_RSI: "30"
+          RULES_SELL_RSI: "70"
+          RULES_DCA_DROP: "3.0"
+
+        run: |
+          dotnet run --project src/CryptoAlerts.Worker/CryptoAlerts.Worker.csproj -c Release
+
