@@ -67,21 +67,16 @@ try
 {
     var decision = await useCase.ExecuteAsync(CancellationToken.None);
 
-    // TESTE: Envia email sempre (mesmo sem alerta) para testar no GitHub Actions
-    // TODO: Reverter depois do teste para enviar apenas quando houver alerta
-    await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
-    Console.WriteLine($"Email sent: {decision.Title} - {decision.Message}");
-
-    // Código original (comentado para teste):
-    // if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
-    // {
-    //     await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
-    //     Console.WriteLine($"Email sent: {decision.Title}");
-    // }
-    // else
-    // {
-    //     Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
-    // }
+    // Envia e-mail apenas quando houver alerta de compra ou venda
+    if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
+    {
+        await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
+        Console.WriteLine($"Email sent: {decision.Title}");
+    }
+    else
+    {
+        Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
+    }
 }
 catch (HttpRequestException httpEx)
 {
