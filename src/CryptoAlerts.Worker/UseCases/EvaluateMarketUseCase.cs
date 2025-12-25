@@ -1,22 +1,21 @@
 using CryptoAlerts.Worker.Domain;
-using CryptoAlerts.Worker.Infra.Binance;
 
 namespace CryptoAlerts.Worker.UseCases;
 
 public sealed class EvaluateMarketUseCase
 {
-    private readonly BinanceClient _binance;
+    private readonly IMarketDataProvider _marketData;
     private readonly AlertRuleConfig _cfg;
 
-    public EvaluateMarketUseCase(BinanceClient binance, AlertRuleConfig cfg)
+    public EvaluateMarketUseCase(IMarketDataProvider marketData, AlertRuleConfig cfg)
     {
-        _binance = binance;
+        _marketData = marketData;
         _cfg = cfg;
     }
 
     public async Task<AlertDecision> ExecuteAsync(CancellationToken ct)
     {
-        var klines = await _binance.GetKlinesAsync(_cfg.Symbol, _cfg.Timeframe, limit: 200, ct);
+        var klines = await _marketData.GetKlinesAsync(_cfg.Symbol, _cfg.Timeframe, limit: 200, ct);
 
         var closes = klines.Select(k => k.Close).ToList();
         var last = closes[^1];

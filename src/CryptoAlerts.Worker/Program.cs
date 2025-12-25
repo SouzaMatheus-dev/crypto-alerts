@@ -1,5 +1,6 @@
 using CryptoAlerts.Worker.Domain;
 using CryptoAlerts.Worker.Infra.Binance;
+using CryptoAlerts.Worker.Infra.CoinGecko;
 using CryptoAlerts.Worker.Infra.Email;
 using CryptoAlerts.Worker.UseCases;
 
@@ -15,13 +16,6 @@ var cfg = new AlertRuleConfig
     DcaDropPercent = decimal.TryParse(Env("RULES_DCA_DROP"), out var dd) ? dd : 3.0m
 };
 
-var binanceOpt = new BinanceOptions
-{
-    BaseUrl = Env("BINANCE_BASEURL") ?? "https://api.binance.com",
-    ApiKey = Env("BINANCE_APIKEY"),      // opcional
-    SecretKey = Env("BINANCE_SECRETKEY") // opcional
-};
-
 var emailOpt = new EmailOptions
 {
     FromEmail = Env("GMAIL_FROM") ?? "",
@@ -34,13 +28,39 @@ if (string.IsNullOrWhiteSpace(emailOpt.FromEmail) ||
     string.IsNullOrWhiteSpace(emailOpt.AppPassword))
 {
     Console.WriteLine("Missing Gmail env vars. Set GMAIL_FROM, GMAIL_TO, GMAIL_APP_PASSWORD.");
+    Environment.Exit(1);
     return;
 }
 
-using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-var binance = new BinanceClient(http, binanceOpt);
+// Escolhe o provedor de dados de mercado (CoinGecko é o padrão, sem bloqueio geográfico)
+IMarketDataProvider marketData;
+var provider = Env("MARKET_DATA_PROVIDER")?.ToLowerInvariant() ?? "coingecko";
 
-var useCase = new EvaluateMarketUseCase(binance, cfg);
+using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+
+if (provider == "binance")
+{
+    var binanceOpt = new BinanceOptions
+    {
+        BaseUrl = Env("BINANCE_BASEURL") ?? "https://api.binance.com",
+        ApiKey = Env("BINANCE_APIKEY"),
+        SecretKey = Env("BINANCE_SECRETKEY")
+    };
+    marketData = new BinanceClient(http, binanceOpt);
+    Console.WriteLine("Usando Binance como provedor de dados de mercado");
+}
+else
+{
+    var coinGeckoOpt = new CoinGeckoOptions
+    {
+        BaseUrl = Env("COINGECKO_BASEURL") ?? "https://api.coingecko.com",
+        ApiKey = Env("COINGECKO_APIKEY") // opcional, mas recomendado para rate limits maiores
+    };
+    marketData = new CoinGeckoClient(http, coinGeckoOpt);
+    Console.WriteLine("Usando CoinGecko como provedor de dados de mercado (sem bloqueio geográfico)");
+}
+
+var useCase = new EvaluateMarketUseCase(marketData, cfg);
 var sender = new GmailSmtpEmailSender(emailOpt);
 
 try
@@ -60,23 +80,26 @@ try
 }
 catch (HttpRequestException httpEx)
 {
-    var errorMsg = $"Erro ao conectar com a API da Binance: {httpEx.Message}";
+    var errorMsg = $"Erro ao conectar com a API de dados de mercado: {httpEx.Message}";
     Console.WriteLine($"ERRO: {errorMsg}");
     
-    // Se for erro 451 (bloqueio geográfico), fornece dicas
+    // Se for erro 451 (bloqueio geográfico da Binance), fornece dicas
     if (httpEx.Message.Contains("451") || httpEx.Message.Contains("Unavailable For Legal Reasons"))
     {
         Console.WriteLine();
-        Console.WriteLine("DICA: O erro 451 geralmente indica bloqueio geográfico.");
+        Console.WriteLine("DICA: O erro 451 geralmente indica bloqueio geográfico da Binance.");
         Console.WriteLine("Soluções possíveis:");
-        Console.WriteLine("  1. Use uma URL alternativa da Binance (ex: api.binance.us)");
-        Console.WriteLine("  2. Execute o worker em uma região não bloqueada");
-        Console.WriteLine("  3. Configure um proxy se necessário");
+        Console.WriteLine("  1. Use CoinGecko como provedor: MARKET_DATA_PROVIDER=coingecko");
+        Console.WriteLine("  2. Use uma URL alternativa da Binance (ex: api.binance.us)");
+        Console.WriteLine("  3. Execute o worker em uma região não bloqueada");
         Console.WriteLine();
     }
     
     // Opcional: enviar e-mail de erro
     // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
+    
+    // Retorna código de erro para falhar o workflow
+    Environment.Exit(1);
 }
 catch (Exception ex)
 {
@@ -86,4 +109,7 @@ catch (Exception ex)
     
     // Opcional: enviar e-mail de erro
     // await sender.SendAsync("Erro no Crypto Alerts", errorMsg, CancellationToken.None);
+    
+    // Retorna código de erro para falhar o workflow
+    Environment.Exit(1);
 }
