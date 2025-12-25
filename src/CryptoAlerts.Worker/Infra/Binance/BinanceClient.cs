@@ -73,8 +73,8 @@ public sealed class BinanceClient : IMarketDataProvider
                 );
             }
             
-            var raw = await fallbackResp.Content.ReadAsStringAsync(ct);
-            return ParseKlines(raw);
+            var fallbackRaw = await fallbackResp.Content.ReadAsStringAsync(ct);
+            return ParseKlines(fallbackRaw);
         }
         
         if (!resp.IsSuccessStatusCode)
