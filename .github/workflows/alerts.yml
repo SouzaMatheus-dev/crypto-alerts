@@ -27,6 +27,7 @@ jobs:
           BINANCE_SECRETKEY: ${{ secrets.BINANCE_SECRETKEY }}
 
           RULES_SYMBOL: "BTCUSDT"
+          RULES_SYMBOLS: "BTCUSDT,ETHUSDT"
           RULES_TIMEFRAME: "1h"
           RULES_RSI_PERIOD: "14"
           RULES_BUY_RSI: "30"

@@ -12,13 +12,23 @@ public sealed class GmailSmtpEmailSender
 
     public async Task SendAsync(string subject, string body, CancellationToken ct)
     {
+        await SendAsync(subject, body, isHtml: false, ct);
+    }
+
+    public async Task SendAsync(string subject, string body, bool isHtml, CancellationToken ct)
+    {
         using var client = new SmtpClient(_opt.SmtpHost, _opt.SmtpPort)
         {
             EnableSsl = true,
-            Credentials = new NetworkCredential(_opt.FromEmail, _opt.AppPassword)
+            Credentials = new NetworkCredential(_opt.FromEmail, _opt.AppPassword),
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            UseDefaultCredentials = false
         };
 
-        using var msg = new MailMessage(_opt.FromEmail, _opt.ToEmail, subject, body);
+        using var msg = new MailMessage(_opt.FromEmail, _opt.ToEmail, subject, body)
+        {
+            IsBodyHtml = isHtml
+        };
 
         await client.SendMailAsync(msg, ct);
     }

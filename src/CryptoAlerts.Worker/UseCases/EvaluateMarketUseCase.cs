@@ -15,7 +15,13 @@ public sealed class EvaluateMarketUseCase
 
     public async Task<AlertDecision> ExecuteAsync(CancellationToken ct)
     {
-        var klines = await _marketData.GetKlinesAsync(_cfg.Symbol, _cfg.Timeframe, limit: 200, ct);
+        var symbol = _cfg.GetSymbolsToMonitor().First();
+        return await ExecuteForSymbolAsync(symbol, ct);
+    }
+
+    public async Task<AlertDecision> ExecuteForSymbolAsync(string symbol, CancellationToken ct)
+    {
+        var klines = await _marketData.GetKlinesAsync(symbol, _cfg.Timeframe, limit: 200, ct);
 
         var closes = klines.Select(k => k.Close).ToList();
         var last = closes[^1];
@@ -31,7 +37,7 @@ public sealed class EvaluateMarketUseCase
         {
             return new AlertDecision(
                 AlertAction.ConsiderBuy,
-                $"ALERTA COMPRA {_cfg.Symbol}",
+                $"ALERTA COMPRA {symbol}",
                 $"Preço: {last} | RSI({_cfg.RsiPeriod}): {rsi} | Queda do topo recente: {dropPct:F2}% (Topo {recentHigh})"
             );
         }
@@ -40,15 +46,55 @@ public sealed class EvaluateMarketUseCase
         {
             return new AlertDecision(
                 AlertAction.ConsiderSell,
-                $"ALERTA VENDA {_cfg.Symbol}",
+                $"ALERTA VENDA {symbol}",
                 $"Preço: {last} | RSI({_cfg.RsiPeriod}): {rsi} | (Aviso: não executa ordem, só sinal)"
             );
         }
 
         return new AlertDecision(
             AlertAction.Hold,
-            $"OK {_cfg.Symbol}",
+            $"OK {symbol}",
             $"Preço: {last} | RSI({_cfg.RsiPeriod}): {rsi} | Topo recente: {recentHigh}"
         );
+    }
+
+    public async Task<ConsolidatedAlertResult> ExecuteMultipleAsync(CancellationToken ct)
+    {
+        var symbols = _cfg.GetSymbolsToMonitor();
+        var results = new List<MarketAnalysisResult>();
+        var alerts = new List<MarketAnalysisResult>();
+        var noAlerts = new List<MarketAnalysisResult>();
+
+        foreach (var symbol in symbols)
+        {
+            try
+            {
+                var decision = await ExecuteForSymbolAsync(symbol, ct);
+                var result = new MarketAnalysisResult(symbol, decision, DateTime.UtcNow);
+                
+                results.Add(result);
+
+                if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
+                {
+                    alerts.Add(result);
+                }
+                else
+                {
+                    noAlerts.Add(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERRO ao processar {symbol}: {ex.Message}");
+                var errorDecision = new AlertDecision(
+                    AlertAction.Info,
+                    $"ERRO {symbol}",
+                    $"Falha ao analisar: {ex.Message}"
+                );
+                results.Add(new MarketAnalysisResult(symbol, errorDecision, DateTime.UtcNow));
+            }
+        }
+
+        return new ConsolidatedAlertResult(results, alerts, noAlerts);
     }
 }

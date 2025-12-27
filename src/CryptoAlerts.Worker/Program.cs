@@ -6,15 +6,34 @@ using CryptoAlerts.Worker.UseCases;
 
 static string? Env(string key) => Environment.GetEnvironmentVariable(key);
 
+static IReadOnlyList<string> ParseSymbols(string? symbolsEnv)
+{
+    if (string.IsNullOrWhiteSpace(symbolsEnv))
+        return Array.Empty<string>();
+
+    return symbolsEnv
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(s => !string.IsNullOrWhiteSpace(s))
+        .ToList();
+}
+
+var symbolsEnv = Env("RULES_SYMBOLS");
+var symbolEnv = Env("RULES_SYMBOL");
+var symbols = ParseSymbols(symbolsEnv);
+
 var cfg = new AlertRuleConfig
 {
-    Symbol = Env("RULES_SYMBOL") ?? "BTCUSDT",
+    Symbol = symbolEnv ?? "BTCUSDT",
+    Symbols = symbols.Count > 0 ? symbols : Array.Empty<string>(),
     Timeframe = Env("RULES_TIMEFRAME") ?? "1h",
     RsiPeriod = int.TryParse(Env("RULES_RSI_PERIOD"), out var rp) ? rp : 14,
     BuyRsiThreshold = decimal.TryParse(Env("RULES_BUY_RSI"), out var br) ? br : 30m,
     SellRsiThreshold = decimal.TryParse(Env("RULES_SELL_RSI"), out var sr) ? sr : 70m,
     DcaDropPercent = decimal.TryParse(Env("RULES_DCA_DROP"), out var dd) ? dd : 3.0m
 };
+
+var symbolsToMonitor = cfg.GetSymbolsToMonitor();
+var isMultiSymbol = symbolsToMonitor.Count > 1;
 
 var emailOpt = new EmailOptions
 {
@@ -64,16 +83,54 @@ var sender = new GmailSmtpEmailSender(emailOpt);
 
 try
 {
-    var decision = await useCase.ExecuteAsync(CancellationToken.None);
-
-    if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
+    if (isMultiSymbol)
     {
-        await sender.SendAsync(decision.Title, decision.Message, CancellationToken.None);
-        Console.WriteLine($"Email sent: {decision.Title}");
+        Console.WriteLine($"Monitorando {symbolsToMonitor.Count} criptomoedas: {string.Join(", ", symbolsToMonitor)}");
+        var consolidated = await useCase.ExecuteMultipleAsync(CancellationToken.None);
+
+        Console.WriteLine($"Análise concluída: {consolidated.TotalAnalyzed} criptos | {consolidated.TotalAlerts} alertas");
+
+        if (consolidated.HasAlerts)
+        {
+            var emailMode = Env("EMAIL_MODE")?.ToLowerInvariant() ?? "consolidated";
+
+            if (emailMode == "individual")
+            {
+                foreach (var alert in consolidated.Alerts)
+                {
+                    var htmlBody = EmailTemplate.GenerateSingleAlert(alert.Decision);
+                    await sender.SendAsync(alert.Decision.Title, htmlBody, isHtml: true, CancellationToken.None);
+                    Console.WriteLine($"Email enviado: {alert.Decision.Title}");
+                }
+            }
+            else
+            {
+                var subject = $"Crypto Alerts - {consolidated.TotalAlerts} Oportunidade(s) Detectada(s)";
+                var htmlBody = EmailTemplate.GenerateConsolidatedAlert(consolidated);
+
+                await sender.SendAsync(subject, htmlBody, isHtml: true, CancellationToken.None);
+                Console.WriteLine($"Email consolidado enviado: {consolidated.TotalAlerts} alerta(s)");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Nenhum alerta detectado em todas as criptomoedas monitoradas.");
+        }
     }
     else
     {
-        Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
+        var decision = await useCase.ExecuteAsync(CancellationToken.None);
+
+        if (decision.Action is AlertAction.ConsiderBuy or AlertAction.ConsiderSell)
+        {
+            var htmlBody = EmailTemplate.GenerateSingleAlert(decision);
+            await sender.SendAsync(decision.Title, htmlBody, isHtml: true, CancellationToken.None);
+            Console.WriteLine($"Email sent: {decision.Title}");
+        }
+        else
+        {
+            Console.WriteLine($"No alert. {decision.Title} - {decision.Message}");
+        }
     }
 }
 catch (HttpRequestException httpEx)

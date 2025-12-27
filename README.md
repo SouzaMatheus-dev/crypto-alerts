@@ -94,13 +94,17 @@ Configure os seguintes secrets no repositório:
 O workflow já está configurado com valores padrão, mas você pode personalizar:
 
 ```yaml
-RULES_SYMBOL: 'BTCUSDT' # Par de negociação
+RULES_SYMBOL: 'BTCUSDT' # Par único (modo legado)
+RULES_SYMBOLS: 'BTCUSDT,ETHUSDT,SOLUSDT' # Múltiplos pares (separados por vírgula)
 RULES_TIMEFRAME: '1h' # Intervalo dos candles
 RULES_RSI_PERIOD: '14' # Período do RSI
 RULES_BUY_RSI: '30' # Threshold para alerta de compra
 RULES_SELL_RSI: '70' # Threshold para alerta de venda
 RULES_DCA_DROP: '3.0' # Percentual de queda para DCA
+EMAIL_MODE: 'consolidated' # Modo de email: 'consolidated' ou 'individual'
 ```
+
+**Nota**: Se `RULES_SYMBOLS` estiver configurado, ele tem prioridade sobre `RULES_SYMBOL`. Use vírgula para separar múltiplos símbolos.
 
 ### 3. Provedor de Dados
 
@@ -143,19 +147,46 @@ dotnet run --project src/CryptoAlerts.Worker/CryptoAlerts.Worker.csproj
 
 ## 📊 Exemplo de Alertas
 
-### Alerta de Compra
+### Modo Single (Uma Cripto)
+
+**Alerta de Compra:**
 
 ```
 Assunto: ALERTA COMPRA BTCUSDT
 Mensagem: Preço: 45000 | RSI(14): 28.5 | Queda do topo recente: -5.2% (Topo 47500)
 ```
 
-### Alerta de Venda
+**Alerta de Venda:**
 
 ```
 Assunto: ALERTA VENDA BTCUSDT
 Mensagem: Preço: 65000 | RSI(14): 72.3 | (Aviso: não executa ordem, só sinal)
 ```
+
+### Modo Multi (Múltiplas Criptos - Consolidado)
+
+**Email Consolidado:**
+
+```
+Assunto: Crypto Alerts - 2 Oportunidade(s) Detectada(s)
+
+🚨 ALERTAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ALERTA COMPRA ETHUSDT
+Preço: 2800 | RSI(14): 28.5 | Queda do topo recente: -4.2% (Topo 2923)
+
+ALERTA VENDA SOLUSDT
+Preço: 120 | RSI(14): 72.3 | (Aviso: não executa ordem, só sinal)
+
+✅ Sem Alertas:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OK BTCUSDT - Preço: 45000 | RSI(14): 52.1 | Topo recente: 45500
+```
+
+### Modo Multi (Individual)
+
+Quando `EMAIL_MODE=individual`, cada alerta é enviado em email separado (comportamento igual ao modo single).
 
 ## 🔧 Arquitetura
 
